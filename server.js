@@ -1,4 +1,12 @@
+const express = require('express');
+const http = require('http');
+const socketIO = require('socket.io');
+const app = express();
+const server = http.createServer(app);
+const io = socketIO(server);
 
+io.on('connection', (socket) => {
+  console.log(`Novo usuário conectado: ${socket.id}`);
 
   socket.on('signal', (data) => {
     io.to(data.to).emit('signal', {
