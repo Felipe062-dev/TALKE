@@ -4,13 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Talky - Verificação</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <script>
+    // Função para verificar a maioridade
     function handleResposta(resposta) {
       if (resposta === 'sim') {
         localStorage.setItem("maioridade", "sim");
+        // Redireciona para o chat.html após a verificação
         window.location.href = 'chat.html';
       } else {
         localStorage.setItem("maioridade", "nao");
+        // Exibe uma mensagem caso o usuário não seja maior de idade
         document.getElementById('conteudo').innerHTML = `
           <div class="bg-red-900 p-6 rounded-xl border border-red-700 text-white max-w-xl text-center">
             😢 <strong>Volte quando completar 18 anos.</strong><br><br>
@@ -19,8 +23,15 @@
         `;
       }
     }
+
+    // Função que checa a maioridade ao carregar a página
+    window.onload = function() {
+      const maioridade = localStorage.getItem("maioridade");
+      if (maioridade === "sim") {
+        window.location.href = 'chat.html';
+      }
+    };
   </script>
-  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white flex items-center justify-center min-h-screen font-sans">
   <div id="conteudo" class="text-center space-y-6">
