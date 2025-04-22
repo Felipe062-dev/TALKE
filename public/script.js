@@ -67,9 +67,11 @@ socket.on('peer-connected', async (peerId) => {
 
   peerConnection = createPeerConnection(peerId);
 
-  localStream.getTracks().forEach(track => {
-    peerConnection.addTrack(track, localStream);
-  });
+  if (localStream) {
+    localStream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, localStream);
+    });
+  }
 
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
@@ -83,11 +85,15 @@ socket.on('peer-connected', async (peerId) => {
 // Recebe sinal do outro peer
 socket.on('signal', async (data) => {
   console.log('Recebendo sinal:', data);
+
   if (!peerConnection) {
     peerConnection = createPeerConnection(data.from);
-    localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
-    });
+
+    if (localStream) {
+      localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+      });
+    }
   }
 
   if (data.signal.sdp) {
@@ -119,7 +125,9 @@ function createPeerConnection(peerId) {
   };
 
   pc.ontrack = event => {
-    remoteVideo.srcObject = event.streams[0];
+    if (remoteVideo.srcObject !== event.streams[0]) {
+      remoteVideo.srcObject = event.streams[0];
+    }
   };
 
   return pc;
