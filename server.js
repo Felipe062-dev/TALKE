@@ -1,40 +1,70 @@
 const express = require('express');
 const http = require('http');
-const socketIo = require('socket.io');
+const socketIO = require('socket.io');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIO(server);
 
-// Serve arquivos estáticos (se necessário)
-app.use(express.static('public'));
+let queue = [];
 
-io.on('connection', socket => {
-  console.log('Novo usuário conectado:', socket.id);
+app.use(express.static(path.join(__dirname, 'public')));
 
-  // Envia sinal de oferta para o peer
-  socket.on('signal', data => {
-    console.log('Sinal recebido:', data);
-    io.to(data.to).emit('signal', {
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+io.on('connection', (socket) => {
+  console.log(`Novo usuário conectado: ${socket.id}`);
+  queue.push(socket);
+
+  // Tentativa de pareamento
+  if (queue.length >= 2) {
+    const user1 = queue.shift();
+    const user2 = queue.shift();
+
+    const roomId = `room-${user1.id}-${user2.id}`;
+
+    user1.join(roomId);
+    user2.join(roomId);
+
+    user1.peerId = user2.id;
+    user2.peerId = user1.id;
+
+    user1.emit('start-chat', { roomId, peerId: user2.id });
+    user2.emit('start-chat', { roomId, peerId: user1.id });
+
+    console.log(`Pareados: ${user1.id} <--> ${user2.id}`);
+  }
+
+  // Encaminha sinal WebRTC
+  socket.on('signal', ({ to, signal }) => {
+    console.log(`Sinal de ${socket.id} para ${to}`);
+    io.to(to).emit('signal', {
       from: socket.id,
-      signal: data.signal
+      signal,
     });
   });
 
-  // Inicia a conversa
-  socket.on('start-chat', (roomId) => {
-    socket.emit('start-chat', roomId);
-  });
-
-  // Envia mensagem de chat
+  // Encaminha mensagem de texto
   socket.on('chat-message', (data) => {
-    socket.broadcast.emit('chat-message', data);
+    if (socket.peerId) {
+      io.to(socket.peerId).emit('chat-message', {
+        from: socket.id,
+        message: data.message,
+      });
+    }
   });
 
-  // Evento quando o peer se desconectar
+  // Desconexão
   socket.on('disconnect', () => {
-    console.log('Usuário desconectado:', socket.id);
-    socket.broadcast.emit('peer-disconnected', socket.id);
+    console.log(`Desconectado: ${socket.id}`);
+    queue = queue.filter((user) => user.id !== socket.id);
+
+    if (socket.peerId) {
+      io.to(socket.peerId).emit('peer-disconnected');
+    }
   });
 });
 
