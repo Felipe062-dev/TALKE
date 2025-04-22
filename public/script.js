@@ -67,6 +67,7 @@ socket.on('peer-connected', async (peerId) => {
 
   peerConnection = createPeerConnection(peerId);
 
+  // Adiciona a mídia local à conexão peer
   localStream.getTracks().forEach(track => {
     peerConnection.addTrack(track, localStream);
   });
@@ -119,7 +120,7 @@ function createPeerConnection(peerId) {
   };
 
   pc.ontrack = event => {
-    remoteVideo.srcObject = event.streams[0];
+    remoteVideo.srcObject = event.streams[0]; // Exibe o stream remoto no vídeo
   };
 
   return pc;
