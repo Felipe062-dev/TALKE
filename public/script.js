@@ -1,4 +1,6 @@
+// Conexão com o servidor Socket.IO
 const socket = io();
+
 let peerConnection;
 let localStream;
 let audioTrack, videoTrack;
@@ -8,11 +10,10 @@ const remoteVideo = document.getElementById('remoteVideo');
 const messages = document.getElementById('messages');
 const form = document.getElementById('form');
 const input = document.getElementById('input');
-
 const btnMic = document.getElementById('btn-mic');
 const btnCam = document.getElementById('btn-cam');
 
-// Verificar conexão com o servidor Socket.IO
+// Conexão
 socket.on('connect', () => {
   console.log('Conectado ao servidor Socket.IO');
 });
@@ -21,13 +22,12 @@ socket.on('disconnect', () => {
   console.log('Desconectado do servidor Socket.IO');
 });
 
-// Obter acesso à câmera e microfone
+// Acesso à mídia
 navigator.mediaDevices.getUserMedia({ video: true, audio: true })
   .then(stream => {
     localVideo.srcObject = stream;
     localStream = stream;
 
-    // Armazenar as tracks para controle posterior
     audioTrack = stream.getAudioTracks()[0];
     videoTrack = stream.getVideoTracks()[0];
   })
@@ -36,7 +36,7 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
     alert("Não foi possível acessar a câmera ou microfone. Verifique as permissões.");
   });
 
-// Botão de microfone
+// Controle de áudio
 btnMic.addEventListener('click', () => {
   if (audioTrack) {
     audioTrack.enabled = !audioTrack.enabled;
@@ -46,7 +46,7 @@ btnMic.addEventListener('click', () => {
   }
 });
 
-// Botão de câmera
+// Controle de vídeo
 btnCam.addEventListener('click', () => {
   if (videoTrack) {
     videoTrack.enabled = !videoTrack.enabled;
@@ -56,8 +56,13 @@ btnCam.addEventListener('click', () => {
   }
 });
 
-// Quando emparelhar com outro usuário
-socket.on('matched', async (peerId) => {
+// Pareamento
+socket.on('start-chat', (roomId) => {
+  socket.emit('join-peer', socket.id); // Envia seu próprio ID para o servidor
+});
+
+// Recebe ID do outro usuário e inicia peer connection
+socket.on('peer-connected', async (peerId) => {
   console.log('Emparelhado com:', peerId);
 
   peerConnection = createPeerConnection(peerId);
@@ -75,7 +80,7 @@ socket.on('matched', async (peerId) => {
   });
 });
 
-// Quando receber sinal do outro peer
+// Recebe sinal do outro peer
 socket.on('signal', async (data) => {
   console.log('Recebendo sinal:', data);
   if (!peerConnection) {
@@ -100,7 +105,7 @@ socket.on('signal', async (data) => {
   }
 });
 
-// Criar conexão peer
+// Criação da conexão peer
 function createPeerConnection(peerId) {
   const pc = new RTCPeerConnection();
 
@@ -120,26 +125,25 @@ function createPeerConnection(peerId) {
   return pc;
 }
 
-// Envio de mensagens
+// Enviar mensagem
 form.addEventListener('submit', (e) => {
   e.preventDefault();
   const msg = input.value.trim();
   if (msg !== "") {
     appendMessage(`Você: ${msg}`, 'user');
-    socket.emit('chat-message', msg);
+    socket.emit('chat-message', { message: msg });
     input.value = '';
   }
 });
 
-// Recebe mensagem do parceiro
+// Receber mensagem
 socket.on('chat-message', (data) => {
-  const msgElement = document.createElement('p');
-  msgElement.textContent = `Parceiro: ${data.message}`;
-  chatBox.appendChild(msgElement);
+  if (data && typeof data.message === 'string') {
+    appendMessage(`Parceiro: ${data.message}`, 'other');
+  }
 });
 
-
-// Usuário desconectou
+// Desconexão do parceiro
 socket.on('peer-disconnected', () => {
   appendMessage("O usuário saiu da conversa.", 'info');
   if (peerConnection) {
@@ -148,7 +152,7 @@ socket.on('peer-disconnected', () => {
   }
 });
 
-// Exibe mensagens no chat
+// Exibir mensagem na tela
 function appendMessage(message, type = 'other') {
   const div = document.createElement('div');
   div.classList.add("p-2", "rounded-lg", "w-fit", "max-w-[70%]", "break-words");
@@ -165,8 +169,7 @@ function appendMessage(message, type = 'other') {
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
 
-  // Opcional: Limitar o tamanho da mensagem visível
-  if (div.textContent.length > 100) {
-    div.textContent = div.textContent.substring(0, 100) + '...';
+  if (div.textContent.length > 300) {
+    div.textContent = div.textContent.substring(0, 300) + '...';
   }
 }
