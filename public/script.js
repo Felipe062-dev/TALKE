@@ -13,7 +13,7 @@ const input = document.getElementById('input');
 const btnMic = document.getElementById('btn-mic');
 const btnCam = document.getElementById('btn-cam');
 
-// Conexão
+// Conexão com servidor
 socket.on('connect', () => {
   console.log('Conectado ao servidor Socket.IO');
 });
@@ -23,20 +23,22 @@ socket.on('disconnect', () => {
 });
 
 // Acesso à mídia
-navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-  .then(stream => {
-    localVideo.srcObject = stream;
-    localStream = stream;
+async function initMedia() {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localVideo.srcObject = localStream;
 
-    audioTrack = stream.getAudioTracks()[0];
-    videoTrack = stream.getVideoTracks()[0];
-  })
-  .catch(err => {
+    audioTrack = localStream.getAudioTracks()[0];
+    videoTrack = localStream.getVideoTracks()[0];
+  } catch (err) {
     console.error("Erro ao acessar mídia: ", err);
     alert("Não foi possível acessar a câmera ou microfone. Verifique as permissões.");
-  });
+  }
+}
 
-// Controle de áudio
+initMedia();
+
+// Controle de microfone
 btnMic.addEventListener('click', () => {
   if (audioTrack) {
     audioTrack.enabled = !audioTrack.enabled;
@@ -46,7 +48,7 @@ btnMic.addEventListener('click', () => {
   }
 });
 
-// Controle de vídeo
+// Controle de câmera
 btnCam.addEventListener('click', () => {
   if (videoTrack) {
     videoTrack.enabled = !videoTrack.enabled;
@@ -56,51 +58,51 @@ btnCam.addEventListener('click', () => {
   }
 });
 
-// Pareamento
+// Início do chat
 socket.on('start-chat', (roomId) => {
-  socket.emit('join-peer', socket.id); // Envia seu próprio ID para o servidor
+  socket.emit('join-peer', socket.id);
 });
 
-// Recebe ID do outro usuário e inicia peer connection
+// Receber conexão do par
 socket.on('peer-connected', async (peerId) => {
   console.log('Emparelhado com:', peerId);
+  createConnectionAndSendOffer(peerId);
+});
 
+async function createConnectionAndSendOffer(peerId) {
   peerConnection = createPeerConnection(peerId);
 
-  if (localStream) {
-    localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
-    });
-  }
+  localStream.getTracks().forEach(track => {
+    peerConnection.addTrack(track, localStream);
+  });
 
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
 
   socket.emit('signal', {
     to: peerId,
-    signal: { sdp: offer }
+    signal: { sdp: peerConnection.localDescription }
   });
-});
+}
 
-// Recebe sinal do outro peer
+// Sinalização
 socket.on('signal', async (data) => {
   console.log('Recebendo sinal:', data);
 
   if (!peerConnection) {
     peerConnection = createPeerConnection(data.from);
-
-    if (localStream) {
-      localStream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, localStream);
-      });
-    }
+    localStream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, localStream);
+    });
   }
 
   if (data.signal.sdp) {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal.sdp));
+
     if (data.signal.sdp.type === 'offer') {
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
+
       socket.emit('signal', {
         to: data.from,
         signal: { sdp: answer }
@@ -113,7 +115,13 @@ socket.on('signal', async (data) => {
 
 // Criação da conexão peer
 function createPeerConnection(peerId) {
-  const pc = new RTCPeerConnection();
+  const config = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+    ]
+  };
+
+  const pc = new RTCPeerConnection(config);
 
   pc.onicecandidate = event => {
     if (event.candidate) {
@@ -125,15 +133,14 @@ function createPeerConnection(peerId) {
   };
 
   pc.ontrack = event => {
-    if (remoteVideo.srcObject !== event.streams[0]) {
-      remoteVideo.srcObject = event.streams[0];
-    }
+    console.log("Track recebida", event.streams);
+    remoteVideo.srcObject = event.streams[0];
   };
 
   return pc;
 }
 
-// Enviar mensagem
+// Envio de mensagem
 form.addEventListener('submit', (e) => {
   e.preventDefault();
   const msg = input.value.trim();
@@ -144,14 +151,14 @@ form.addEventListener('submit', (e) => {
   }
 });
 
-// Receber mensagem
+// Recebimento de mensagem
 socket.on('chat-message', (data) => {
   if (data && typeof data.message === 'string') {
     appendMessage(`Parceiro: ${data.message}`, 'other');
   }
 });
 
-// Desconexão do parceiro
+// Desconexão do par
 socket.on('peer-disconnected', () => {
   appendMessage("O usuário saiu da conversa.", 'info');
   if (peerConnection) {
@@ -160,7 +167,7 @@ socket.on('peer-disconnected', () => {
   }
 });
 
-// Exibir mensagem na tela
+// Adiciona mensagens ao chat
 function appendMessage(message, type = 'other') {
   const div = document.createElement('div');
   div.classList.add("p-2", "rounded-lg", "w-fit", "max-w-[70%]", "break-words");
