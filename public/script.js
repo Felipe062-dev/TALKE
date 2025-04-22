@@ -13,30 +13,20 @@ const input = document.getElementById('input');
 const btnMic = document.getElementById('btn-mic');
 const btnCam = document.getElementById('btn-cam');
 
-// Conexão com servidor
-socket.on('connect', () => {
-  console.log('Conectado ao servidor Socket.IO');
-});
+// Acesso imediato à mídia
+navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+  .then(stream => {
+    localStream = stream;
+    localVideo.srcObject = stream;
+    audioTrack = stream.getAudioTracks()[0];
+    videoTrack = stream.getVideoTracks()[0];
 
-socket.on('disconnect', () => {
-  console.log('Desconectado do servidor Socket.IO');
-});
-
-// Acesso à mídia
-async function initMedia() {
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    localVideo.srcObject = localStream;
-
-    audioTrack = localStream.getAudioTracks()[0];
-    videoTrack = localStream.getVideoTracks()[0];
-  } catch (err) {
+    socket.emit('join-peer', socket.id); // Solicita pareamento imediato após acessar mídia
+  })
+  .catch(err => {
     console.error("Erro ao acessar mídia: ", err);
     alert("Não foi possível acessar a câmera ou microfone. Verifique as permissões.");
-  }
-}
-
-initMedia();
+  });
 
 // Controle de microfone
 btnMic.addEventListener('click', () => {
@@ -58,12 +48,16 @@ btnCam.addEventListener('click', () => {
   }
 });
 
-// Início do chat
-socket.on('start-chat', (roomId) => {
-  socket.emit('join-peer', socket.id);
+// Conexão com servidor
+socket.on('connect', () => {
+  console.log('Conectado ao servidor Socket.IO');
 });
 
-// Receber conexão do par
+socket.on('disconnect', () => {
+  console.log('Desconectado do servidor Socket.IO');
+});
+
+// Emparelhamento
 socket.on('peer-connected', async (peerId) => {
   console.log('Emparelhado com:', peerId);
   createConnectionAndSendOffer(peerId);
@@ -134,7 +128,9 @@ function createPeerConnection(peerId) {
 
   pc.ontrack = event => {
     console.log("Track recebida", event.streams);
-    remoteVideo.srcObject = event.streams[0];
+    if (!remoteVideo.srcObject) {
+      remoteVideo.srcObject = event.streams[0];
+    }
   };
 
   return pc;
@@ -188,3 +184,4 @@ function appendMessage(message, type = 'other') {
     div.textContent = div.textContent.substring(0, 300) + '...';
   }
 }
+
