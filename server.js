@@ -9,9 +9,9 @@ const io = socketIO(server);
 // Configuração para servir arquivos estáticos (HTML, CSS, JS) da pasta 'public'
 app.use(express.static(path.join(__dirname, 'public'))); // A pasta 'public' deve conter os arquivos estáticos
 
-// Rota para a página principal
+// Serve o arquivo index.html quando a raiz do site é acessada
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html')); // Serve o arquivo index.html quando a raiz for acessada
+  res.sendFile(path.join(__dirname, 'public', 'index.html')); // Serve o arquivo index.html da pasta 'public'
 });
 
 io.on('connection', (socket) => {
@@ -43,5 +43,6 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
+
 
 
