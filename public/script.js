@@ -132,9 +132,12 @@ form.addEventListener('submit', (e) => {
 });
 
 // Recebe mensagem do parceiro
-socket.on('chat-message', (msg) => {
-  appendMessage(`Parceiro: ${msg}`, 'other');
+socket.on('chat-message', (data) => {
+  const msgElement = document.createElement('p');
+  msgElement.textContent = `Parceiro: ${data.message}`;
+  chatBox.appendChild(msgElement);
 });
+
 
 // Usuário desconectou
 socket.on('peer-disconnected', () => {
