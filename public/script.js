@@ -108,8 +108,11 @@ socket.on('signal', async (data) => {
 
 // Criação da conexão peer
 function createPeerConnection(peerId) {
-  const pc = new RTCPeerConnection();
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] // Adiciona STUN server para garantir NAT traversal
+  });
 
+  // Adiciona a mídia local à conexão peer
   pc.onicecandidate = event => {
     if (event.candidate) {
       socket.emit('signal', {
@@ -119,8 +122,9 @@ function createPeerConnection(peerId) {
     }
   };
 
+  // Exibe a mídia remota (vídeo) no elemento `remoteVideo`
   pc.ontrack = event => {
-    remoteVideo.srcObject = event.streams[0]; // Exibe o stream remoto no vídeo
+    remoteVideo.srcObject = event.streams[0]; 
   };
 
   return pc;
