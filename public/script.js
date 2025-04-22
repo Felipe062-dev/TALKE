@@ -12,18 +12,28 @@ const input = document.getElementById('input');
 const btnMic = document.getElementById('btn-mic');
 const btnCam = document.getElementById('btn-cam');
 
+// Verificar conexão com o servidor Socket.IO
+socket.on('connect', () => {
+  console.log('Conectado ao servidor Socket.IO');
+});
+
+socket.on('disconnect', () => {
+  console.log('Desconectado do servidor Socket.IO');
+});
+
 // Obter acesso à câmera e microfone
 navigator.mediaDevices.getUserMedia({ video: true, audio: true })
   .then(stream => {
     localVideo.srcObject = stream;
     localStream = stream;
 
-    // Armazena as tracks para controle posterior
+    // Armazenar as tracks para controle posterior
     audioTrack = stream.getAudioTracks()[0];
     videoTrack = stream.getVideoTracks()[0];
   })
   .catch(err => {
     console.error("Erro ao acessar mídia: ", err);
+    alert("Não foi possível acessar a câmera ou microfone. Verifique as permissões.");
   });
 
 // Botão de microfone
@@ -67,6 +77,7 @@ socket.on('matched', async (peerId) => {
 
 // Quando receber sinal do outro peer
 socket.on('signal', async (data) => {
+  console.log('Recebendo sinal:', data);
   if (!peerConnection) {
     peerConnection = createPeerConnection(data.from);
     localStream.getTracks().forEach(track => {
@@ -128,6 +139,10 @@ socket.on('chat-message', (msg) => {
 // Usuário desconectou
 socket.on('peer-disconnected', () => {
   appendMessage("O usuário saiu da conversa.", 'info');
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
 });
 
 // Exibe mensagens no chat
@@ -146,4 +161,9 @@ function appendMessage(message, type = 'other') {
   div.textContent = message;
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
+
+  // Opcional: Limitar o tamanho da mensagem visível
+  if (div.textContent.length > 100) {
+    div.textContent = div.textContent.substring(0, 100) + '...';
+  }
 }
